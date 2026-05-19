@@ -1,0 +1,110 @@
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Manrope:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+    margin: 0;
+    font-family: 'Manrope', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background: #0A0A0A;
+    color: #FFFFFF;
+}
+
+.font-anton {
+    font-family: 'Anton', sans-serif;
+    letter-spacing: -0.01em;
+}
+
+::selection {
+    background: #CCFF00;
+    color: #000;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #0A0A0A; }
+::-webkit-scrollbar-thumb { background: #222; }
+::-webkit-scrollbar-thumb:hover { background: #CCFF00; }
+
+@layer base {
+    :root {
+        --background: 0 0% 4%;
+        --foreground: 0 0% 100%;
+        --card: 0 0% 7%;
+        --card-foreground: 0 0% 100%;
+        --popover: 0 0% 7%;
+        --popover-foreground: 0 0% 100%;
+        --primary: 73 100% 50%;
+        --primary-foreground: 0 0% 0%;
+        --secondary: 0 0% 10%;
+        --secondary-foreground: 0 0% 100%;
+        --muted: 0 0% 13%;
+        --muted-foreground: 0 0% 60%;
+        --accent: 0 0% 13%;
+        --accent-foreground: 0 0% 100%;
+        --destructive: 0 100% 50%;
+        --destructive-foreground: 0 0% 100%;
+        --border: 0 0% 13%;
+        --input: 0 0% 13%;
+        --ring: 73 100% 50%;
+        --radius: 0rem;
+    }
+}
+
+@layer base {
+    * {
+        @apply border-border;
+    }
+    body {
+        @apply bg-background text-foreground;
+    }
+}
+
+/* Neon glow utilities */
+.glow-lime { box-shadow: 0 0 20px rgba(204, 255, 0, 0.4); }
+.glow-red  { box-shadow: 0 0 20px rgba(255, 59, 48, 0.4); }
+.glow-cyan { box-shadow: 0 0 20px rgba(0, 240, 255, 0.4); }
+
+.text-glow-lime { text-shadow: 0 0 12px rgba(204, 255, 0, 0.6); }
+
+/* Flash animation for live updates */
+@keyframes flash {
+    0%, 100% { background-color: transparent; }
+    50% { background-color: rgba(204, 255, 0, 0.15); }
+}
+.flash-update { animation: flash 1.2s ease-in-out; }
+
+/* Streak glow when count increases */
+@keyframes streak-glow {
+    0%, 100% {
+        filter: drop-shadow(0 0 4px rgba(255, 136, 0, 0.5));
+        transform: scale(1);
+    }
+    50% {
+        filter: drop-shadow(0 0 18px rgba(255, 136, 0, 1));
+        transform: scale(1.25);
+    }
+}
+.streak-glow { animation: streak-glow 0.7s ease-in-out infinite; }
+
+/* Hide scrollbar for mobile carousel */
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+
+/* Mobile carousel snap */
+.snap-x-mandatory { scroll-snap-type: x mandatory; }
+.snap-item { scroll-snap-align: center; scroll-snap-stop: always; }
+
+/* Tactical grid overlay */
+.tactical-grid {
+    background-image:
+        linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 48px 48px;
+}
