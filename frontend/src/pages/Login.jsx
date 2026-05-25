@@ -1,11 +1,28 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Lightning, GoogleLogo, Barbell } from "@phosphor-icons/react";
+import { API } from "../lib/api";
 
 // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
 export default function Login() {
+  // Liest ?auth_error=... aus der URL (Backend redirected hierher bei Fehlern)
+  const [authError, setAuthError] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const err = params.get("auth_error");
+    if (err) {
+      setAuthError(err);
+      // URL aufraeumen, damit der Fehler beim Reload weg ist
+      const cleaned = window.location.pathname;
+      window.history.replaceState({}, "", cleaned);
+    }
+  }, []);
+
   const handleLogin = () => {
-    const redirectUrl = window.location.origin + "/dashboard";
-    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
+    // Vollstaendiger Seitenwechsel im SELBEN Tab — kein Popup, kein One-Tap.
+    // Backend redirected zu accounts.google.com und nach erfolgreicher Auswahl
+    // direkt zu /dashboard (mit gesetztem session_token Cookie).
+    window.location.href = `${API}/auth/google/login?redirect=/dashboard`;
   };
 
   const heroBg = "https://static.prod-images.emergentagent.com/jobs/cab27bbf-b8ed-47b3-9c24-72819e38a03a/images/13c703faf7c4289b7773d3e5cac5d9ce07621f6f90e7bf17fbd16a361b0cd884.png";
@@ -55,6 +72,15 @@ export default function Login() {
             <GoogleLogo size={20} weight="bold" />
             <span>Mit Google fortfahren</span>
           </button>
+
+          {authError && (
+            <p
+              className="mt-4 text-xs tracking-widest uppercase text-[#FF3B30]"
+              data-testid="login-error"
+            >
+              Login fehlgeschlagen: {authError}
+            </p>
+          )}
 
           <div className="mt-12 pt-8 border-t border-[#222]">
             <div className="flex items-center gap-3 text-[#8A8A8A] text-xs tracking-widest uppercase">

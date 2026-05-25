@@ -21,6 +21,27 @@ export default function Insights({ open, onClose }) {
     })();
   }, [open]);
 
+  // ✅ SCROLL BLOCKIEREN: Body overflow:hidden wenn Panel offen
+  useEffect(() => {
+    if (!open) return;
+    
+    const originalOverflow = document.body.style.overflow;
+    const originalPaddingRight = document.body.style.paddingRight;
+    
+    // Scrollbar-Breite ermitteln um Layout-Shift zu vermeiden
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    
+    document.body.style.overflow = "hidden";
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+    
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.paddingRight = originalPaddingRight;
+    };
+  }, [open]);
+
   return (
     <AnimatePresence>
       {open && (
@@ -61,7 +82,11 @@ export default function Insights({ open, onClose }) {
                   <div className="border border-[#1A1A1A] bg-[#121212] p-4 flex items-center gap-3">
                     <Lightning size={20} weight="fill" className="text-[#CCFF00]" />
                     <p className="text-[11px] uppercase tracking-widest text-[#8A8A8A]">
-                      Insights basieren auf <span className="text-white font-anton text-base mx-1">{data.weeks_tracked}</span> protokollierten Wochen
+                      {data.weeks_tracked === 1 ? (
+                        <>Insights basieren auf <span className="text-white font-anton text-base mx-1">1</span> protokollierter Woche</>
+                      ) : (
+                        <>Insights basieren auf <span className="text-white font-anton text-base mx-1">{data.weeks_tracked}</span> protokollierten Wochen</>
+                      )}
                     </p>
                   </div>
 
@@ -79,7 +104,23 @@ export default function Insights({ open, onClose }) {
 }
 
 function ExerciseInsight({ ex }) {
-  const maxVal = Math.max(...ex.by_weekday, 1);
+  // Defensive: Sicherstellen dass by_weekday existiert und ein Array ist
+  const byWeekday = Array.isArray(ex.by_weekday) ? ex.by_weekday : [0, 0, 0, 0, 0, 0, 0];
+  const maxVal = Math.max(...byWeekday, 1);
+
+  // Defensive: Sicherstellen dass share_per_day existiert
+  const sharePerDay = Array.isArray(ex.share_per_day) ? ex.share_per_day : [0, 0, 0, 0, 0, 0, 0];
+
+  // Defensive: Sicherstellen dass consistency existiert
+  const consistency = Array.isArray(ex.consistency) ? ex.consistency : [0, 0, 0, 0, 0, 0, 0];
+
+  const unitLower = (ex.unit || "").toLowerCase();
+  const isDistance = unitLower.includes("km") || unitLower === "m" || unitLower.includes("mi");
+
+  // Mindesthöhe = exakt so groß, dass die Total-Zahl bequem unten im Balken sitzt.
+  // Darüber hinaus lineare Proportionalität: Tage mit höherem Wert wachsen deutlich.
+  const MIN_FIT_PCT = 18; // ~32px bei h-44 (176px) – passt für 11px Zahl + Padding
+
   return (
     <div className="border border-[#1A1A1A] bg-[#121212] p-5 space-y-5" data-testid={`insight-${ex.key}`}>
       <div className="flex items-center justify-between">
@@ -95,74 +136,108 @@ function ExerciseInsight({ ex }) {
       </div>
 
       {/* Power Day callout */}
-      {ex.power_day !== null && (
+      {ex.power_day !== null && ex.power_day !== undefined && (
         <div className="flex items-stretch gap-2 text-[11px]">
           <div className="flex-1 border border-[#CCFF00]/40 bg-[#CCFF00]/[0.05] px-3 py-2" data-testid={`power-day-${ex.key}`}>
             <div className="flex items-center gap-1.5 text-[#CCFF00] uppercase tracking-widest text-[9px] mb-1">
               <Trophy size={11} weight="fill" /> Power-Day
             </div>
-            <p className="font-anton text-base text-white leading-none">{DAY_LABELS_FULL[ex.power_day]}</p>
-            <p className="text-[10px] text-[#888] mt-1">{ex.share_per_day[ex.power_day]}% deiner Gesamtleistung</p>
+            <p className="font-anton text-base text-white leading-none">{DAY_LABELS_FULL[ex.power_day] || "—"}</p>
+            <p className="text-[10px] text-[#888] mt-1">{sharePerDay[ex.power_day] || 0}% deiner Gesamtleistung</p>
           </div>
-          {ex.weakest_day !== null && ex.weakest_day !== ex.power_day && (
+          {ex.weakest_day !== null && ex.weakest_day !== undefined && ex.weakest_day !== ex.power_day && (
             <div className="flex-1 border border-[#444] px-3 py-2" data-testid={`weak-day-${ex.key}`}>
               <div className="flex items-center gap-1.5 text-[#888] uppercase tracking-widest text-[9px] mb-1">
-                Schwacher Tag
+                Loser Day
               </div>
-              <p className="font-anton text-base text-white leading-none">{DAY_LABELS_FULL[ex.weakest_day]}</p>
-              <p className="text-[10px] text-[#666] mt-1">{ex.share_per_day[ex.weakest_day]}% Anteil</p>
+              <p className="font-anton text-base text-white leading-none">{DAY_LABELS_FULL[ex.weakest_day] || "—"}</p>
+              <p className="text-[10px] text-[#666] mt-1">{sharePerDay[ex.weakest_day] || 0}% Anteil</p>
             </div>
           )}
         </div>
       )}
 
-      {/* Bar chart Mo-So */}
+      {/* Bar chart Mo-So – Layout in zwei Reihen:
+          1) Bar-Area mit FIXER Höhe (h-44). Balken sind direkte Flex-Kinder,
+             damit height: pct% sauber gegen die Parent-Höhe rechnet.
+          2) Label-Reihe (Mo–So) darunter – jede Spalte mit flex-1, exakt unter
+             dem zugehörigen Balken. */}
       <div>
         <p className="text-[9px] uppercase tracking-[0.25em] text-[#555] mb-3">Verteilung (Total)</p>
-        <div className="flex items-end justify-between gap-1.5 h-24">
+
+        {/* Reihe 1: Balken */}
+        <div className="flex items-end justify-between gap-1.5 h-44" data-testid={`distribution-${ex.key}`}>
           {DAY_LABELS.map((day, i) => {
-            const v = ex.by_weekday[i];
-            const pct = Math.max(2, (v / maxVal) * 100);
+            const v = byWeekday[i] || 0;
+            const hasData = v > 0;
+            const rawPct = maxVal > 0 ? (v / maxVal) * 100 : 0;
+            const pct = hasData ? Math.max(MIN_FIT_PCT, rawPct) : 3;
             const isPower = i === ex.power_day;
+            const label = hasData ? (isDistance ? Number(v).toFixed(1) : Math.round(v)) : "";
             return (
-              <div key={day} className="flex-1 flex flex-col items-center gap-1 min-w-0">
-                <div className="w-full flex-1 flex items-end">
-                  <div
-                    className="w-full transition-all"
-                    style={{
-                      height: `${pct}%`,
-                      background: isPower ? ex.color : `${ex.color}55`,
-                      boxShadow: isPower ? `0 0 12px ${ex.color}` : "none",
-                    }}
-                    title={`${day}: ${v}${ex.unit ? ` ${ex.unit}` : ""}`}
-                  />
-                </div>
-                <span className={`text-[9px] uppercase tracking-widest ${isPower ? "text-white" : "text-[#555]"}`}>
-                  {day}
-                </span>
+              <div
+                key={day}
+                className="flex-1 min-w-0 relative transition-all"
+                style={{
+                  height: `${pct}%`,
+                  background: hasData ? (isPower ? ex.color : `${ex.color}AA`) : "#222",
+                  boxShadow: isPower && hasData ? `0 0 12px ${ex.color}` : "none",
+                }}
+                title={`${day}: ${v}${ex.unit ? ` ${ex.unit}` : ""}`}
+              >
+                {hasData && (
+                  <span
+                    className="absolute left-0 right-0 bottom-1 text-center font-anton tabular-nums text-[10px] md:text-[11px] leading-none text-black px-0.5"
+                    style={{ textShadow: "0 1px 0 rgba(255,255,255,0.25)" }}
+                  >
+                    {label}
+                  </span>
+                )}
               </div>
+            );
+          })}
+        </div>
+
+        {/* Reihe 2: Labels Mo–So – exakt unter dem jeweiligen Balken */}
+        <div className="flex justify-between gap-1.5 mt-2">
+          {DAY_LABELS.map((day, i) => {
+            const isPower = i === ex.power_day;
+            const hasData = (byWeekday[i] || 0) > 0;
+            return (
+              <span
+                key={day}
+                className={`flex-1 min-w-0 text-center text-[9px] uppercase tracking-widest ${isPower && hasData ? "text-white" : "text-[#555]"}`}
+              >
+                {day}
+              </span>
             );
           })}
         </div>
       </div>
 
-      {/* Consistency */}
+      {/* Consistency – farbcodiert nach Prozent:
+          ≥80% grün, ≥60% gelb, ≥40% orange, <40% rot, <20% rot mit reduzierter Opacity */}
       <div>
         <p className="text-[9px] uppercase tracking-[0.25em] text-[#555] mb-2">Trainings-Konsistenz</p>
         <div className="grid grid-cols-7 gap-1.5">
-          {ex.consistency.map((c, i) => (
-            <div key={i} className="text-center">
-              <div
-                className="h-1.5 mb-1"
-                style={{
-                  background: c >= 70 ? "#00FF66" : c >= 40 ? ex.color : c >= 20 ? "#444" : "#1A1A1A",
-                  opacity: c >= 20 ? 1 : 0.4,
-                }}
-              />
-              <p className="text-[9px] text-[#666] uppercase tracking-widest leading-none">{DAY_LABELS[i]}</p>
-              <p className="text-[10px] text-white font-anton mt-0.5">{c}%</p>
-            </div>
-          ))}
+          {consistency.map((c, i) => {
+            const color =
+              c >= 80 ? "#00FF66" :
+              c >= 60 ? "#FFD93D" :
+              c >= 40 ? "#FF8C00" :
+              "#FF3B30";
+            const opacity = c >= 20 ? 1 : c > 0 ? 0.5 : 0.25;
+            return (
+              <div key={i} className="text-center">
+                <div
+                  className="h-2 mb-1"
+                  style={{ background: color, opacity }}
+                />
+                <p className="text-[9px] text-[#666] uppercase tracking-widest leading-none">{DAY_LABELS[i]}</p>
+                <p className="text-[10px] text-white font-anton mt-0.5">{c}%</p>
+              </div>
+            );
+          })}
         </div>
         <p className="text-[10px] text-[#555] mt-2">% der Wochen mit Aktivität an diesem Tag</p>
       </div>
